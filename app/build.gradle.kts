@@ -30,6 +30,9 @@ android {
         buildConfigField("boolean", "FIONA", "true")
         // Fiona 自更新清单;换成别的地址只改这一行
         buildConfigField("String", "FIONA_UPDATE_URL", "\"https://dafeiyu.followhongyun.com:8443/fiona/version.json\"")
+        // Fiona 的首页:她本人的云端面板(经 chat 子域转发,带一次性 token)
+        buildConfigField("String", "FIONA_BRIDGE_URL", "\"https://chat.followhongyun.com:8443/fiona-api\"")
+        buildConfigField("String", "FIONA_BRIDGE_KEY", "\"3lzfkydoAAeGTFaXLsdq87S8X3BcpgWj\"")
         buildConfigField("boolean", "ADB_LOGS", "false")
     }
 
@@ -118,6 +121,7 @@ kotlin {
 dependencies {
     implementation(files("libs/sherpa-onnx-2.0.1.aar"))
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation(libs.androidx.activity.compose)
     implementation(project(":core"))
     implementation(libs.protobuf.lite)
     implementation(platform(libs.compose.bom))

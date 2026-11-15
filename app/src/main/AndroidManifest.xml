@@ -126,14 +126,10 @@
         <!-- 界面只有一个:从桌面、通知、别的 App 或命令打开都回到这一个(新的打开交给 onNewIntent),不在上面叠出第二个 -->
         <activity
             android:name=".ui.MainActivity"
-            android:exported="true"
+            android:exported="false"
             android:launchMode="singleTask"
             android:theme="@style/Theme.Mika"
             android:windowSoftInputMode="adjustResize">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
             <!-- 覆盖磁贴长按的系统默认应用详情页，直接回到 Mika。 -->
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
@@ -391,6 +387,19 @@
             </intent-filter>
         </receiver>
         <receiver android:name=".teach.TeachReceiver" android:exported="false" />
+
+        <!-- Fiona 首页:她本人的聊天窗口 -->
+        <activity
+            android:name=".fiona.FionaChatActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
 
         <!-- Fiona 展示页:主人要看的把结果摆到主屏 -->
         <activity
