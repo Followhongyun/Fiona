@@ -392,6 +392,14 @@
         </receiver>
         <receiver android:name=".teach.TeachReceiver" android:exported="false" />
 
+        <!-- Fiona 展示页:主人要看的把结果摆到主屏 -->
+        <activity
+            android:name=".fiona.FionaShowActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar" />
+
         <!-- Fiona 自更新:把下载好的 APK 交给系统安装器 -->
         <provider
             android:name="androidx.core.content.FileProvider"

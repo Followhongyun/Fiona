@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.ByteArrayOutputStream
+import java.io.File
 import kotlin.coroutines.resume
 
 /**
@@ -186,6 +187,137 @@ class FionaActions(private val context: Context) : PhoneActionsPort {
             if (score > 0 && (best == null || score > best!!.second)) best = info.activityInfo.packageName to score
         }
         return best?.first
+    }
+
+    override suspend fun shell(command: String): JsonObject {
+        val app = context.applicationContext as? com.wangzan101.mika.MikaApp
+            ?: return buildJsonObject { put("ok", false); put("error", "no application context") }
+        val helper = app.phone.hub.shell.value
+            ?: return buildJsonObject {
+                put("ok", false)
+                put("error", "shell helper is not running (start it once from a computer over USB)")
+            }
+        val bundle = runCatching { helper.runCommand(command) }.getOrNull()
+            ?: return buildJsonObject { put("ok", false); put("error", "the helper refused the command") }
+        val code = bundle.getInt("exitCode")
+        return buildJsonObject {
+            put("ok", code == 0)
+            put("exit_code", code)
+            put("output", bundle.getString("output").orEmpty())
+        }
+    }
+
+    // ---- background screen (virtual display) ----
+
+    private var bg: com.wangzan101.mika.cap.phone.display.AgentDisplay? = null
+    private var bgPackage: String? = null
+
+    private fun helper(): com.wangzan101.mika.shell.IMikaShell? =
+        (context.applicationContext as? com.wangzan101.mika.MikaApp)?.phone?.hub?.shell?.value
+
+    override suspend fun backgroundOpen(packageName: String): JsonObject {
+        backgroundClose()
+        val sh = helper() ?: return buildJsonObject { put("ok", false); put("error", "shell helper is not running") }
+        val dm = context.getSystemService(android.hardware.display.DisplayManager::class.java)
+        val w = 720
+        val h = 1280
+        val display = runCatching {
+            com.wangzan101.mika.cap.phone.display.AgentDisplay(sh, w, h, 320, dm)
+        }.getOrNull() ?: return buildJsonObject { put("ok", false); put("error", "could not create the virtual screen") }
+        val code = runCatching { sh.startApp(display.displayId, packageName) }.getOrElse { -1 }
+        if (code != 0) {
+            display.release()
+            return buildJsonObject {
+                put("ok", false); put("code", code)
+                put("error", when (code) {
+                    1 -> "the person is using this app on the main screen right now; not starting a second copy"
+                    2 -> "no launchable activity"
+                    else -> "could not start the app on the virtual screen"
+                })
+            }
+        }
+        bg = display
+        bgPackage = packageName
+        kotlinx.coroutines.delay(1200)
+        return buildJsonObject {
+            put("ok", true); put("package", packageName)
+            put("width", display.width); put("height", display.height)
+            put("display_id", display.displayId)
+        }
+    }
+
+    override suspend fun backgroundScreen(maxWidth: Int): ByteArray? {
+        val display = bg ?: return null
+        val bmp = display.latestFrameBitmap() ?: return null
+        val scaled = scale(bmp, maxWidth)
+        return ByteArrayOutputStream().use { out ->
+            scaled.compress(Bitmap.CompressFormat.PNG, 100, out)
+            if (scaled !== bmp) scaled.recycle()
+            bmp.recycle()
+            out.toByteArray()
+        }
+    }
+
+    override suspend fun backgroundTap(x: Float, y: Float): Boolean {
+        val display = bg ?: return false
+        val sh = helper() ?: return false
+        return runCatching { sh.injectTap(display.displayId, x.toInt(), y.toInt()) }.getOrDefault(false)
+    }
+
+    override suspend fun backgroundKey(key: String): Boolean {
+        val display = bg ?: return false
+        val sh = helper() ?: return false
+        val code = when (key) {
+            "back" -> android.view.KeyEvent.KEYCODE_BACK
+            "home" -> android.view.KeyEvent.KEYCODE_HOME
+            "enter" -> android.view.KeyEvent.KEYCODE_ENTER
+            "delete" -> android.view.KeyEvent.KEYCODE_DEL
+            else -> key.toIntOrNull() ?: return false
+        }
+        return runCatching { sh.injectKey(display.displayId, code) }.getOrDefault(false)
+    }
+
+    override suspend fun backgroundClose(): Boolean {
+        val display = bg ?: return true
+        bg = null
+        bgPackage = null
+        return runCatching { display.release(); true }.getOrDefault(false)
+    }
+
+    // ---- showing a result on the main screen ----
+
+    override suspend fun show(url: String?, text: String?, caption: String?, imagePng: ByteArray?): JsonObject {
+        if (!url.isNullOrBlank()) {
+            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            return runCatching { context.startActivity(intent); buildJsonObject { put("ok", true); put("shown", "url") } }
+                .getOrElse { buildJsonObject { put("ok", false); put("error", it.message ?: "could not open the link") } }
+        }
+        var imagePath: String? = null
+        if (imagePng != null) {
+            imagePath = File(context.cacheDir, "fiona-show.png").apply { writeBytes(imagePng) }.absolutePath
+        }
+        if (text.isNullOrBlank() && imagePath == null) {
+            return buildJsonObject { put("ok", false); put("error", "give url, text or image_png_base64") }
+        }
+        val intent = FionaShowActivity.intent(context, caption, text, imagePath)
+        return runCatching { context.startActivity(intent); buildJsonObject { put("ok", true); put("shown", if (imagePath != null) "image" else "text") } }
+            .getOrElse { buildJsonObject { put("ok", false); put("error", it.message ?: "could not show the result") } }
+    }
+
+    override suspend fun presence(): JsonObject {
+        val power = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        val current = currentApp()
+        return buildJsonObject {
+            val interactive = power.isInteractive
+            val locked = keyguard.isKeyguardLocked
+            put("screen_on", interactive)
+            put("locked", locked)
+            put("ready", interactive && !locked)
+            current["package"]?.let { put("foreground", it) }
+            current["label"]?.let { put("label", it) }
+        }
     }
 
     override suspend fun currentApp(): JsonObject {

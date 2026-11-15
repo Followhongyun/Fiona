@@ -33,6 +33,39 @@ interface PhoneActionsPort {
     /** Foreground package/activity plus screen size and lock state. */
     suspend fun currentApp(): JsonObject
 
+    /**
+     * Run a command as the Android shell user (uid 2000) — the same identity adb gets.
+     * Returns exit code and combined output. This is the admin door: pm, settings, dumpsys,
+     * input, screencap all work here, exactly as they do over adb.
+     */
+    suspend fun shell(command: String): JsonObject
+
+    /**
+     * Background screen: open [package] on a virtual display so it does not disturb the main screen.
+     * Returns the display size to use for taps.
+     */
+    suspend fun backgroundOpen(packageName: String): JsonObject
+
+    /** PNG of the background display, long edge at most [maxWidth]. Null when nothing is open. */
+    suspend fun backgroundScreen(maxWidth: Int): ByteArray?
+
+    /** Tap on the background display, in its own coordinates. */
+    suspend fun backgroundTap(x: Float, y: Float): Boolean
+
+    /** Send a key (back/home/enter/delete or a raw Android key code as text) to the background display. */
+    suspend fun backgroundKey(key: String): Boolean
+
+    suspend fun backgroundClose(): Boolean
+
+    /**
+     * Bring a result to the main screen on purpose: a page/URL, a block of text, or an image.
+     * Only for when the person asked to see something; background work belongs on the virtual screen.
+     */
+    suspend fun show(url: String?, text: String?, caption: String?, imagePng: ByteArray?): JsonObject
+
+    /** Whether the person is holding the phone right now (screen on, unlocked, foreground app). */
+    suspend fun presence(): JsonObject
+
     val screenWidth: Int
     val screenHeight: Int
 }

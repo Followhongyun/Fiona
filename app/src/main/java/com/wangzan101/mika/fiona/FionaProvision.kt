@@ -31,6 +31,23 @@ object FionaProvision {
         val body = runCatching { input.readText() }.getOrNull()
         val parsed = runCatching { Json.parseToJsonElement(body.orEmpty()) as JsonObject }.getOrNull()
         val action = (parsed?.get("action") as? JsonPrimitive)?.contentOrNull?.trim()
+        if (action == "allow-wake") {
+            // Let the owner's agent wake the screen remotely. Unlock still needs a credential and Android 13+.
+            val ok = runCatching { app.deviceAccess.settings.setEnabled(true) }.isSuccess
+            result.writeText(if (ok) """{"ok":true,"wake":true}""" else """{"ok":false,"error":"could not enable"}""")
+            input.delete()
+            return@withContext
+        }
+        if (action == "pin") {
+            // Store the screen-lock PIN in the encrypted device store; it never leaves the phone afterwards.
+            val pin = (parsed?.get("value") as? JsonPrimitive)?.contentOrNull?.trim()
+            val ok = pin != null && runCatching {
+                app.deviceAccess.settings.setCredential(com.wangzan101.mika.core.device.CredentialKind.Pin, pin)
+            }.isSuccess
+            result.writeText(if (ok) """{"ok":true,"pin_stored":true}""" else """{"ok":false,"error":"could not store pin"}""")
+            input.delete()
+            return@withContext
+        }
         if (action == "update") {
             val ok = runCatching { FionaUpdater.checkAndInstall(app, force = true) }.isSuccess
             result.writeText(if (ok) """{"ok":true,"checked":true}""" else """{"ok":false,"error":"update check failed"}""")
