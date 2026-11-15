@@ -426,6 +426,10 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
         super.onCreate()
         // 上次进程在复制或绑定分享草稿途中退出时留下的临时文件;目录至多保留一份有效草稿。
         runCatching { sharedDrafts.cleanup() }
+        // Fiona: pick up a provisioning file dropped by adb (pairing the gateway without the UI).
+        scope.launch(Dispatchers.IO) { runCatching { com.wangzan101.mika.fiona.FionaProvision.run(this@MikaApp) } }
+        // Fiona: look for a newer build on the owner's server and hand it to the installer.
+        scope.launch(Dispatchers.IO) { runCatching { com.wangzan101.mika.fiona.FionaUpdater.checkAndInstall(this@MikaApp) } }
         scope.launch(Dispatchers.IO) {
             runCatching { com.wangzan101.mika.task.AndroidDeviceFiles.cleanupStaging(SandboxDirs(this@MikaApp)) }
                 .onFailure { Log.w("MikaImport", "Could not clean device import staging", it) }

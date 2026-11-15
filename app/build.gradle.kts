@@ -1,3 +1,4 @@
+import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -19,13 +20,16 @@ android {
         applicationId = "com.wangzan101.mika"
         minSdk = 29
         targetSdk = 35
-        versionCode = 44
-        versionName = "0.1.43"
+        // Fiona 自己的版本线:每次发布 +1,升级时才认得出是新包
+        versionCode = (project.findProperty("fionaVersionCode") as String?)?.toInt() ?: 45
+        versionName = (project.findProperty("fionaVersionName") as String?) ?: "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
         // 关于页版本号后的 Beta 标记;出正式版时改成 false
         buildConfigField("boolean", "BETA", "true")
         buildConfigField("boolean", "FIONA", "true")
+        // Fiona 自更新清单;换成别的地址只改这一行
+        buildConfigField("String", "FIONA_UPDATE_URL", "\"https://dafeiyu.followhongyun.com:8443/fiona/version.json\"")
         buildConfigField("boolean", "ADB_LOGS", "false")
     }
 
@@ -56,6 +60,20 @@ android {
     // 评测任务集(仓库根目录 eval/tasks)打进测试包的 assets,真机评测跑器从那里读题
     sourceSets.getByName("androidTest").assets.srcDir(rootProject.file("eval/tasks"))
 
+    // 固定签名:换版本能直接覆盖安装,不会因为签名不同要求卸载
+    signingConfigs {
+        create("fiona") {
+            val props = Properties().apply {
+                val f = rootProject.file("fiona-signing.properties")
+                if (f.exists()) f.inputStream().use { load(it) }
+            }
+            storeFile = file(props.getProperty("storeFile") ?: System.getenv("FIONA_KEYSTORE") ?: "${'$'}{rootDir}/../keys/fiona-release.jks")
+            storePassword = props.getProperty("storePassword") ?: System.getenv("FIONA_STORE_PASS") ?: ""
+            keyAlias = props.getProperty("keyAlias") ?: "fiona"
+            keyPassword = props.getProperty("keyPassword") ?: System.getenv("FIONA_KEY_PASS") ?: ""
+        }
+    }
+
     buildTypes {
         // 真机验收时并排安装,保留发行版和用户数据;默认构建标识不变。
         if (providers.gradleProperty("devInstall").isPresent) getByName("debug") {
@@ -64,6 +82,9 @@ android {
         }
         // 看流畅度用的包:和发布版一样不可调试(调试包不做预先编译,界面慢好几倍,手感不作数),
         // 用本机调试签名,能直接覆盖调试包、保留数据;可被性能工具采样。./gradlew :app:assemblePerf
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("fiona")
+        }
         create("perf") {
             initWith(getByName("release"))
             signingConfig = signingConfigs.getByName("debug")
@@ -96,6 +117,7 @@ kotlin {
 
 dependencies {
     implementation(files("libs/sherpa-onnx-2.0.1.aar"))
+    implementation("androidx.core:core-ktx:1.13.1")
     implementation(project(":core"))
     implementation(libs.protobuf.lite)
     implementation(platform(libs.compose.bom))
