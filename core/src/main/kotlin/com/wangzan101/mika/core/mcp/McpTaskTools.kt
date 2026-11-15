@@ -24,12 +24,14 @@ class McpTaskTools(
     private val service: RemoteTaskService,
     device: DeviceAccess? = null,
     calls: com.wangzan101.mika.core.calls.PhoneCallPort? = null,
+    actions: com.wangzan101.mika.core.device.PhoneActionsPort? = null,
 ) {
     constructor(tasks: RemoteTasks, pollMs: Long = 250, device: DeviceAccess? = null) :
         this(RemoteTaskService(tasks, pollMs), device)
 
     private val deviceTools = device?.let(::McpDeviceTools)
     private val callTools = calls?.let(::McpCallTools)
+    private val actionTools = actions?.let(::McpActionTools)
     class ToolError(message: String) : Exception(message)
 
     data class Tool(val name: String, val description: String, val schema: JsonObject, val readOnly: Boolean)
@@ -79,7 +81,7 @@ class McpTaskTools(
             schema(required = emptyList()) {
                 putJsonObject("limit") { put("type", "integer"); put("minimum", 1); put("maximum", MAX_LIST); put("description", "How many (default $DEFAULT_LIST).") }
             }, readOnly = true),
-    ) + deviceTools?.tools.orEmpty() + callTools?.tools.orEmpty()
+    ) + deviceTools?.tools.orEmpty() + callTools?.tools.orEmpty() + actionTools?.tools.orEmpty()
 
     /** MCP 的工具定义(tools/list 的一项)。 */
     fun definitions(): JsonArray = buildJsonArray {
@@ -136,6 +138,7 @@ class McpTaskTools(
             }
             else -> if (deviceTools?.tools?.any { it.name == name } == true) deviceTools.call(name, args)
                 else if (callTools?.tools?.any { it.name == name } == true) callTools.call(name, args)
+                else if (actionTools?.tools?.any { it.name == name } == true) actionTools.call(name, args)
                 else throw ToolError("Unknown tool: $name")
         }
     } catch (e: RemoteTaskError) {

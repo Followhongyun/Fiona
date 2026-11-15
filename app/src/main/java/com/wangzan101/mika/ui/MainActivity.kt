@@ -482,7 +482,8 @@ private fun MikaRoot(
     val onboardingState = remember { OnboardingState(context) }
     fun onboardingInputs() = Onboarding.Inputs(
         hasMainModel = store.roles.value.main != null,
-        modelSetupDone = onboardingState.modelSetupDone(),
+        // Fiona has no model of its own: the brain lives on the owner's side, so onboarding must not demand one.
+        modelSetupDone = BuildConfig.FIONA || onboardingState.modelSetupDone(),
         phoneNeeded = status.builtinShell != BuiltinShellStatus.Running && status.sdkInt >= Prerequisites.MIN_SDK,
         phoneGuideSeen = phoneSetup.guideSeen(),
     )

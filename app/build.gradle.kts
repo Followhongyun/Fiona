@@ -25,6 +25,7 @@ android {
         buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
         // 关于页版本号后的 Beta 标记;出正式版时改成 false
         buildConfigField("boolean", "BETA", "true")
+        buildConfigField("boolean", "FIONA", "true")
         buildConfigField("boolean", "ADB_LOGS", "false")
     }
 

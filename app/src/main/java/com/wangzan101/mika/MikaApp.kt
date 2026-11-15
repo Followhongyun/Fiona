@@ -103,6 +103,9 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
                 com.wangzan101.mika.settings.KeystoreKeyCipher("mika-wechat-account")))
     }
 
+    /** Fiona: raw phone actions for an external brain (see core PhoneActionsPort). No model involved. */
+    val fionaActions by lazy { com.wangzan101.mika.fiona.FionaActions(this) }
+
     /** 本机授权的主屏唤醒/解锁；电脑连接和无人值守定时任务共用同一条确定性流程。 */
     val deviceAccess by lazy { com.wangzan101.mika.device.AndroidDeviceAccess(this) { phone.hub.shell.value } }
 
@@ -122,7 +125,7 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
                 migrateTaskOwner = remoteTasks::migrateUsbOwner),
             remoteTasks, deviceAccess,
             com.wangzan101.mika.settings.RelaySettings(settingsDir, com.wangzan101.mika.settings.KeystoreKeyCipher("mika-remote-relay")),
-            history, callPort)
+            history, callPort, fionaActions)
     }
     val childRuns by lazy { FileChildRunStore(java.io.File(filesDir, "children-v3.json")) }
 
