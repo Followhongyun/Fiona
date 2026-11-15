@@ -136,6 +136,15 @@ internal class McpActionTools(private val actions: PhoneActionsPort) {
                 putJsonArray("required") { add("key") }; put("additionalProperties", false)
             }, false),
         McpTaskTools.Tool(BG_CLOSE, "Close the hidden virtual screen and the app on it.", noArgs(), false),
+        McpTaskTools.Tool(BRING,
+            "Move the app from the hidden background screen onto the MAIN screen, where it left off — " +
+            "the direct way to show the person what you were doing (e.g. the Douyin feed you were scrolling). " +
+            "Pair with fiona_send_back to put it away again.",
+            noArgs(), false),
+        McpTaskTools.Tool(SEND_BACK,
+            "Move the app back from the main screen to the hidden background screen. Refuses when the foreground " +
+            "app is not the one from the background screen, so it never yanks away something the person opened.",
+            noArgs(), false),
         McpTaskTools.Tool(SHOW,
             "Put a result on the MAIN screen for the person to see. Use it only when they asked to see something, " +
             "or when a result cannot be usefully delivered as chat text. Give url, text, or image_png_base64; " +
@@ -229,6 +238,8 @@ internal class McpActionTools(private val actions: PhoneActionsPort) {
             val image = str("image_png_base64")?.let { runCatching { Base64.getDecoder().decode(it) }.getOrNull() }
             actions.show(str("url"), str("text"), str("caption"), image)
         }
+        BRING -> actions.bringToMain()
+        SEND_BACK -> actions.sendBack()
         PRESENCE -> actions.presence()
         CURRENT -> actions.currentApp()
         else -> throw McpTaskTools.ToolError("Unknown tool: $name")
@@ -254,6 +265,8 @@ internal class McpActionTools(private val actions: PhoneActionsPort) {
         const val BG_TAP = "fiona_bg_tap"
         const val BG_KEY = "fiona_bg_key"
         const val BG_CLOSE = "fiona_bg_close"
+        const val BRING = "fiona_bring"
+        const val SEND_BACK = "fiona_send_back"
         const val SHOW = "fiona_show"
         const val PRESENCE = "fiona_presence"
         const val CURRENT = "fiona_current"

@@ -305,6 +305,41 @@ class FionaActions(private val context: Context) : PhoneActionsPort {
             .getOrElse { buildJsonObject { put("ok", false); put("error", it.message ?: "could not show the result") } }
     }
 
+    override suspend fun bringToMain(): JsonObject {
+        val display = bg ?: return buildJsonObject { put("ok", false); put("error", "nothing is open on the background screen") }
+        val sh = helper() ?: return buildJsonObject { put("ok", false); put("error", "shell helper is not running") }
+        val task = runCatching { sh.topTaskId(display.displayId) }.getOrDefault(-1)
+        if (task < 0) return buildJsonObject { put("ok", false); put("error", "the background screen has no app on it") }
+        val pkg = runCatching { sh.packageOfTask(task) }.getOrNull()
+        val moved = runCatching { sh.moveTask(task, android.view.Display.DEFAULT_DISPLAY) }.getOrDefault(false)
+        return buildJsonObject {
+            put("ok", moved)
+            put("task_id", task)
+            pkg?.let { put("package", it) }
+            if (!moved) put("error", "the system refused to move the task")
+        }
+    }
+
+    override suspend fun sendBack(): JsonObject {
+        val display = bg ?: return buildJsonObject { put("ok", false); put("error", "the background screen is not open any more") }
+        val sh = helper() ?: return buildJsonObject { put("ok", false); put("error", "shell helper is not running") }
+        val task = runCatching { sh.topTaskId(android.view.Display.DEFAULT_DISPLAY) }.getOrDefault(-1)
+        if (task < 0) return buildJsonObject { put("ok", false); put("error", "nothing is in the foreground") }
+        val pkg = runCatching { sh.packageOfTask(task) }.getOrNull()
+        val expected = bgPackage
+        if (expected != null && pkg != expected) {
+            return buildJsonObject {
+                put("ok", false); put("package", pkg ?: ""); put("expected", expected)
+                put("error", "the person is looking at something else; leave it alone")
+            }
+        }
+        val moved = runCatching { sh.moveTask(task, display.displayId) }.getOrDefault(false)
+        return buildJsonObject {
+            put("ok", moved); put("task_id", task); pkg?.let { put("package", it) }
+            if (!moved) put("error", "the system refused to move the task")
+        }
+    }
+
     override suspend fun presence(): JsonObject {
         val power = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager

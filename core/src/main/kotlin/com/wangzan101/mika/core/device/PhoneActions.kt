@@ -63,6 +63,15 @@ interface PhoneActionsPort {
      */
     suspend fun show(url: String?, text: String?, caption: String?, imagePng: ByteArray?): JsonObject
 
+    /**
+     * Move the app that is running on the background screen onto the MAIN screen, exactly where it was.
+     * This is how she shows the thing she was working on instead of describing it.
+     */
+    suspend fun bringToMain(): JsonObject
+
+    /** Move it back to the background screen afterwards (only if the foreground app is still hers). */
+    suspend fun sendBack(): JsonObject
+
     /** Whether the person is holding the phone right now (screen on, unlocked, foreground app). */
     suspend fun presence(): JsonObject
 
