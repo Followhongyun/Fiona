@@ -161,11 +161,19 @@ class McpRpc(
         } catch (e: Exception) {
             return Call.Done(toolResult("Mika could not do that: ${e.message ?: e::class.simpleName}", null, isError = true))
         }
-        return Call.Done(toolResult(out.toString(), out, isError = false))
+        // A tool may hand back an image; send it as a real MCP image block instead of a wall of base64 text.
+        val image = (out["image_png_base64"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+        val structured = if (image != null) JsonObject(out - "image_png_base64") else out
+        return Call.Done(toolResult(if (image != null) "screenshot" else structured.toString(), structured, isError = false, image = image))
     }
 
-    private fun toolResult(text: String, structured: JsonObject?, isError: Boolean) = buildJsonObject {
-        putJsonArray("content") { add(buildJsonObject { put("type", "text"); put("text", text) }) }
+    private fun toolResult(text: String, structured: JsonObject?, isError: Boolean, image: String? = null) = buildJsonObject {
+        putJsonArray("content") {
+            add(buildJsonObject { put("type", "text"); put("text", text) })
+            image?.let { data ->
+                add(buildJsonObject { put("type", "image"); put("mimeType", "image/png"); put("data", data) })
+            }
+        }
         structured?.let { put("structuredContent", it) }
         put("isError", isError)
     }
